@@ -1,0 +1,9 @@
+env = Environment()
+env.Replace(CXXFLAGS=['-O3','-Wall','-ansi','-pedantic', '-std=c++11'],
+            LIBS=['pthread'])
+env.SharedLibrary('salpa', ['LocalFit.cpp'])
+env.Program('posthocsalpa', ['LocalFit.cpp', 'posthoctasked.cpp'])
+#env.Program('posthocsalpa2', ['LocalFit.cpp', 'posthocthr2.cpp'])
+env.Program('posthocsalpa1', ['LocalFit.cpp', 'posthocthreaded.cpp'])
+env.Program('posthocsalpa0', ['LocalFit.cpp', 'posthocsalpa.cpp'])
+#env.Program('tqtest', ['TQTest.cpp'])

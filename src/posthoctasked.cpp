@@ -9,8 +9,6 @@
 #include <cstring>
 #include "TaskQueue.h"
 
-constexpr int LOG2BUFSIZE = 12;
-constexpr int NTHREADS = 8;
 /* Number of threads is experimentally determined for each computer.
    Ditto for bufsize. On my home laptop, 12 is the best number,
    corresponds to 3,145,728 bytes total for 384 channels. That number
@@ -20,24 +18,28 @@ constexpr int NTHREADS = 8;
 
 void usage() {
   std::cerr
-    << "Usage: posthocsalpa -F samplerate_kHz -c channelcount -C fullcount\n"
-    << "                 -t threshold_digi -x threshold_std\n"
-    << "                 -l halflength_ms\n"
-    << "                 -a asymtime_ms -b blanktime_ms -A Ahead_ms\n"
-    << "                 -r rail1_digi[,rail2_digi]\n"
-    << "                 -p period_ms -d delay_ms -f forcepeg_ms\n"
-    << "                 -P forcepeg_filename\n"
-    << "                 -B\n"
+    << "Usage: salpa -F samplerate_kHz -c channelcount -C fullcount\n"
+    << "             -t threshold_digi -x threshold_std\n"
+    << "             -l halflength_ms\n"
+    << "             -a asymtime_ms -b blanktime_ms -A Ahead_ms\n"
+    << "             -r rail1_digi[,rail2_digi]\n"
+    << "             -p period_ms -d delay_ms -f forcepeg_ms\n"
+    << "             -P forcepeg_filename\n"
+    << "             -T thread_count -S buffer_size\n"
+    << "             -i input_file -o output_file\n"
+    << "             -B\n"
     << "\n"
     << "Performs post-hoc artifact filtering using LocalFit.\n"
     << "-F must be given before any of the parameters that are specified in ms\n"
     << "-c specifies the number of channels to process; -C the total number of\n"
     << "   channels in a scan. (For instance, for a UCLA probe, -c might be 128\n"
-    << "   whereas -C is 142.)\n"
+    << "   whereas -C might be 142.) If only one of -c or -C is given, the\n"
+    << "   other is assumed to be the same.\n"
+    << "-t specifies acceptability threshold as an absolute digital value.\n"
+    << "-x specifies acceptability threshold as a multiple of estimated\n"
+    << "   RMS noise. (The estimate is made using the first part of the\n"
+    << "   recording.)\n"
     << "-t and -x are mutually exclusive.\n"
-    << "-n can be used to read a previously recorded noise estimate from disk iff\n"
-    << "   -x is used. If -x is given without -n, artifilt will estimate the noise\n"
-    << "   anew, based on the first 2 s of the recording, using NoiseLevels.\n"
     << "-l specifies the half-width of the fit window (tau).\n"
     << "-a specifies the size of the beginning of the fit window used for initial\n"
     << "   goodness-of-fit estimation.\n"
@@ -48,17 +50,20 @@ void usage() {
     << "   does not really hit the rail. Pegs of length f are enforced at t=k*p+d.\n"
     << "-P specifies the name of a file containing sample numbers where pegs should\n"
     << "   be forced. -P and -p/-d are mutually exclusive.\n"
+    << "-T specifies thread count.\n"
+    << "-S specifies buffer size in scans; rounded down to power of two.\n"
+    << "-i and -o specify input and output filenames. If not given, \n"
+    << "   stdin/stdout are used, which does not work right on Windows.\n"
     << "-B enables subtracting of baseline before processing. This is useful\n"
     << "   for numerical stability if baseline is far from zero.\n"
     << "\n"
     << "Default values are:\n"
     << "   F = 30,000, c = C = 64, l = 3 ms,\n"
     << "   a = 0.2 ms, b = 0.4 ms, A = 0.2 ms, x = 3,\n"
-    << "   r = -32767,32767, and no forced peg response.\n";
+    << "   r = -32767,32767, no forced peg response,\n"
+    << "   T = 8, S = 4096\n";
 exit(1);
 }
-
-
 
 class Params {
 public:
@@ -77,8 +82,16 @@ public:
   int forcepeg_sams;
   char const *forcepeg_filename;
   bool basesub;
+  int nthreads;
+  int log2bufsize;
+  char const *input_filename;
+  char const *output_filename;
 public:
   Params() {
+    input_filename = 0;
+    output_filename = 0;
+    nthreads = 8;
+    log2bufsize = 12;
     nchans = 0;
     totalchans = 0;
     freq_hz = 25000;
@@ -136,6 +149,10 @@ public:
         case 'f': forcepeg_sams = int(freq_hz * atof(arg) / 1000); break;
         case 'P': forcepeg_filename = arg; break;
         case 'B': basesub = true; break;
+        case 'T': nthreads = atoi(arg); break;
+        case 'S': log2bufsize = int(log(atoi(arg)) / log(2)); break;
+        case 'i': input_filename = arg; break;
+        case 'o': output_filename = arg; break;
         default:
           std::cerr << "Unknown parameter: " << letter << "\n";
           return false;
@@ -173,22 +190,34 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (p.thresh_digi!=0 && p.thresh_std!=0)
+  if (p.thresh_digi!=0 && p.thresh_std!=0) {
     usage();
+    return 1;
+  }
 
   FILE *in = stdin;
   FILE *out = stdout;
   FILE *events = 0;
 
+  if (p.input_filename) {
+    in = std::fopen(p.input_filename, "rb");
+    if (!in)
+      crash("Cannot open input file");
+  }
+  if (p.output_filename) {
+    out = std::fopen(p.output_filename, "wb");
+    if (!out)
+      crash("Cannot open output file");
+  }
   if (p.forcepeg_filename) {
     events = std::fopen(p.forcepeg_filename, "r");
     if (!events)
-      crash("Cannot open timestamp filename");
+      crash("Cannot open timestamp file");
   }
 
-  constexpr int BUFSAMS = 1<<LOG2BUFSIZE;
-  constexpr int FRAGSAMS = BUFSAMS / 4;
-  constexpr int FRAGMASK = FRAGSAMS - 1;
+  const int BUFSAMS = 1<<p.log2bufsize;
+  const int FRAGSAMS = BUFSAMS / 4;
+  const int FRAGMASK = FRAGSAMS - 1;
   
   std::vector<raw_t> inbuf(p.totalchans*BUFSAMS);
   std::vector<raw_t> outbuf(p.totalchans*BUFSAMS);  
@@ -196,9 +225,9 @@ int main(int argc, char **argv) {
   std::vector<CyclBuf<raw_t>> outbufs;
   for (int c=0; c<p.totalchans; c++) {
     inbufs.push_back(CyclBuf<raw_t>(inbuf.data() + c,
-                                    LOG2BUFSIZE, p.totalchans));
+                                    p.log2bufsize, p.totalchans));
     outbufs.push_back(CyclBuf<raw_t>(outbuf.data() + c,
-                                     LOG2BUFSIZE, p.totalchans));
+                                     p.log2bufsize, p.totalchans));
   }
 
   timeref_t filledto = 0;
@@ -248,7 +277,7 @@ int main(int argc, char **argv) {
   std::cerr << "pre\n" << savedto << " " << processedto << " "
             << filledto << " " << nextpeg << " " << events << "\n";
 
-  TaskQueue<std::packaged_task<void()>> pool(NTHREADS);
+  TaskQueue<std::packaged_task<void()>> pool(p.nthreads);
   
   while (go_on) {
     go_on = false;
@@ -283,8 +312,8 @@ int main(int argc, char **argv) {
       go_on=true;
       if (nextpeg < mightprocessto) {
         // process to upcoming peg
-        int step = p.nchans / NTHREADS;
-        if (step*NTHREADS < p.nchans)
+        int step = p.nchans / p.nthreads;
+        if (step*p.nthreads < p.nchans)
           step ++;
         timeref_t t1 = nextpeg;
         timeref_t t2 = nextpeg + p.forcepeg_sams;
@@ -314,8 +343,8 @@ int main(int argc, char **argv) {
             nextpeg = INFTY;
       } else {
         // process as far as we have loaded
-        int step = p.nchans / NTHREADS;
-        if (step*NTHREADS < p.nchans)
+        int step = p.nchans / p.nthreads;
+        if (step*p.nthreads < p.nchans)
           step ++;
         timeref_t t1 = mightprocessto;
         for (int c0=0; c0<p.nchans; c0+=step) {
@@ -369,7 +398,7 @@ int main(int argc, char **argv) {
       crash("LocalFit doesn't like my data!");
 
   // let's save last bit
-  constexpr int BUFMASK = BUFSAMS - 1;
+  const int BUFMASK = BUFSAMS - 1;
   while (savedto<processedto) {
     std::cerr << "go_on\n" << savedto << " " << processedto << " "
               << filledto << " " << nextpeg << " " << events << "\n";

@@ -19,7 +19,7 @@
 // LocalFit.C
 
 #include "LocalFit.h"
-
+#include <iostream>
 #include <cmath>
 #include <cstdlib>
 
@@ -56,10 +56,15 @@ LocalFit::LocalFit(CyclBuf<raw_t> const &source0,
   t_blankdepeg(t_blankdepeg0),
   t_ahead(t_ahead0),
   t_chi2(t_chi20) {
+  usenegv = true;
   state = State::PEGGED;
   t_peg = t_stream = t_start;
   init_T();
   rail1=RAIL1; rail2=RAIL2;
+}
+
+void LocalFit::setusenegv(bool t) {
+  usenegv = t;
 }
 
 void LocalFit::reset(timeref_t t_start) {
@@ -171,11 +176,13 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
     else
       toopoorcnt = TOOPOORCNT;
     if (toopoorcnt<=0 && asym < my_thresh/3.92) {
-      int dt = t_stream - t0;
-      int dt2=dt*dt;
-      int dt3=dt*dt2;
-      negv =  source[t_stream] < raw_t(alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3);
-
+      if (usenegv) {
+        int dt = t_stream - t0;
+        int dt2=dt*dt;
+        int dt3=dt*dt2;
+        negv = source[t_stream]
+          < raw_t(alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3);
+      }
       calc_X012(); calc_X3(); // for numerical stability problem!
       goto l_BLANKDEPEG;
     }
@@ -210,15 +217,17 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
       return State::BLANKDEPEG;
     if (t_stream >= t0-tau+t_blankdepeg)
       goto l_DEPEGGING;
-    int dt=t_stream-t0;
-    int dt2=dt*dt;
-    int dt3=dt*dt2;
-    raw_t y = source[t_stream];
-    y -= alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3;
-    if ((y<0) != negv) {
-      dest[t_stream] = y;
-      t_stream++;
-      goto l_DEPEGGING;
+    if (usenegv) {
+      int dt=t_stream-t0;
+      int dt2=dt*dt;
+      int dt3=dt*dt2;
+      raw_t y = source[t_stream];
+      y -= alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3;
+      if ((y<0) != negv) {
+        dest[t_stream] = y;
+        t_stream++;
+        goto l_DEPEGGING;
+      }
     }
     dest[t_stream] = 0;
     t_stream++;
@@ -366,3 +375,7 @@ void LocalFit::crash(char const *msg) {
   std::exit(1);
 }
 
+void LocalFit::condreport() {
+  if (t_stream < 45000)
+    report();
+}

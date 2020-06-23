@@ -80,6 +80,7 @@ public:
 	   timeref_t t_chi2=TCHI2);
   void reset(timeref_t t_start);
   void setrail(raw_t r1, raw_t r2) { rail1=r1; rail2=r2; }
+  void setusenegv(bool);
   timeref_t process(timeref_t t_limit);
   timeref_t forcepeg(timeref_t t_from, timeref_t t_to);
 private:
@@ -104,6 +105,7 @@ private:
   int t_ahead;
   int t_chi2;
   raw_t rail1, rail2;
+  bool usenegv;
 private:
   // self computed constants
   int_t tau_plus_1;
@@ -126,6 +128,7 @@ private:
 public:
   // debug
   void report();
+  void condreport();
   void inirep();
   char const *stateName(State s);
   void crash(char const *);

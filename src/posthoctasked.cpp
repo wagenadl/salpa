@@ -28,6 +28,7 @@ void usage() {
     << "             -T thread_count -S buffer_size\n"
     << "             -i input_file -o output_file\n"
     << "             -B\n"
+    << "             -Z\n"
     << "\n"
     << "Performs post-hoc artifact filtering using LocalFit.\n"
     << "-F must be given before any of the parameters that are specified in ms\n"
@@ -56,6 +57,7 @@ void usage() {
     << "   stdin/stdout are used, which does not work right on Windows.\n"
     << "-B enables subtracting of baseline before processing. This is useful\n"
     << "   for numerical stability if baseline is far from zero.\n"
+    << "-Z specifies that “blank depeg” (-b) is not to be aborted at zero crossing.\n" 
     << "\n"
     << "Default values are:\n"
     << "   F = 30,000, c = C = 64, l = 3 ms,\n"
@@ -86,8 +88,10 @@ public:
   int log2bufsize;
   char const *input_filename;
   char const *output_filename;
+  bool usenegv;
 public:
   Params() {
+    usenegv = true;
     input_filename = 0;
     output_filename = 0;
     nthreads = 8;
@@ -117,7 +121,7 @@ public:
       if (argv[0][0]=='-') {
         char letter = argv[0][1];
         char *arg;
-        if (argv[0][2]>=32 || letter=='B') {
+        if (argv[0][2]>=32 || letter=='B' || letter=='Z') {
           arg = argv[0] + 2;
         } else {
           argc--;
@@ -149,6 +153,7 @@ public:
         case 'f': forcepeg_sams = int(freq_hz * atof(arg) / 1000); break;
         case 'P': forcepeg_filename = arg; break;
         case 'B': basesub = true; break;
+        case 'Z': usenegv = false; break;
         case 'T': nthreads = atoi(arg); break;
         case 'S': log2bufsize = int(log(atoi(arg)) / log(2)); break;
         case 'i': input_filename = arg; break;
@@ -268,14 +273,15 @@ int main(int argc, char **argv) {
                               p.blank_sams, p.ahead_sams,
                               p.asym_sams);
     fitters[c]->setrail(p.rail1 + basesub[c], p.rail2 + basesub[c]);
+    fitters[c]->setusenegv(p.usenegv);
   }
   
   bool at_eof = false;
   bool go_on = true;
 
-  std::cerr << inbufs[5][13] << "\n";
-  std::cerr << "pre\n" << savedto << " " << processedto << " "
-            << filledto << " " << nextpeg << " " << events << "\n";
+  //std::cerr << inbufs[5][13] << "\n";
+  //std::cerr << "pre\n" << savedto << " " << processedto << " "
+  //          << filledto << " " << nextpeg << " " << events << "\n";
 
   TaskQueue<std::packaged_task<void()>> pool(p.nthreads);
   
@@ -384,9 +390,9 @@ int main(int argc, char **argv) {
 
   // -- EOF!
 
-  std::cerr << "go_on\n" << savedto << " " << processedto << " "
-            << filledto << " " << nextpeg << " " << events << "\n";
-  fitters[0]->report();
+  //std::cerr << "go_on\n" << savedto << " " << processedto << " "
+  //          << filledto << " " << nextpeg << " " << events << "\n";
+  //fitters[0]->report();
   
   // let's process the last bit...
   timeref_t mightprocessto = filledto - 2*p.tau_sams - 1;
@@ -400,8 +406,8 @@ int main(int argc, char **argv) {
   // let's save last bit
   const int BUFMASK = BUFSAMS - 1;
   while (savedto<processedto) {
-    std::cerr << "go_on\n" << savedto << " " << processedto << " "
-              << filledto << " " << nextpeg << " " << events << "\n";
+    //std::cerr << "go_on\n" << savedto << " " << processedto << " "
+    //          << filledto << " " << nextpeg << " " << events << "\n";
     int bufidx = savedto & BUFMASK;
     timeref_t saveto = savedto + BUFSAMS - bufidx;
     if (saveto>processedto)

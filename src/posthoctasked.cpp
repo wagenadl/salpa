@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cstdint>
 #include "TaskQueue.h"
 
 /* Number of threads is experimentally determined for each computer.
@@ -27,6 +28,7 @@ void usage() {
     << "             -P forcepeg_filename\n"
     << "             -T thread_count -S buffer_size\n"
     << "             -i input_file -o output_file\n"
+    << "             -M skip_count -N limit_count\n"
     << "             -B\n"
     << "             -Z\n"
     << "\n"
@@ -55,6 +57,8 @@ void usage() {
     << "-S specifies buffer size in scans; rounded down to power of two.\n"
     << "-i and -o specify input and output filenames. If not given, \n"
     << "   stdin/stdout are used, which does not work right on Windows.\n"
+    << "-M skip given number of scans from the beginning of the file.\n"
+    << "-N process only the given number of scans.\n"
     << "-B enables subtracting of baseline before processing. This is useful\n"
     << "   for numerical stability if baseline is far from zero.\n"
     << "-Z specifies that “blank depeg” (-b) is not to be aborted at zero crossing.\n" 
@@ -89,6 +93,8 @@ public:
   char const *input_filename;
   char const *output_filename;
   bool usenegv;
+  std::uint64_t skip_count;
+  std::uint64_t limit_count;
 public:
   Params() {
     usenegv = true;
@@ -112,6 +118,8 @@ public:
     forcepeg_sams = 0;
     forcepeg_filename = 0;
     basesub = false;
+    skip_count = 0;
+    limit_count = 0;
   }
   bool fromArgs(int argc, char **argv) {
     // return true if OK
@@ -158,6 +166,8 @@ public:
         case 'S': log2bufsize = int(log(atoi(arg)) / log(2)); break;
         case 'i': input_filename = arg; break;
         case 'o': output_filename = arg; break;
+        case 'M': skip_count = atol(arg); break;
+        case 'N': limit_count = atol(arg); break;
         default:
           std::cerr << "Unknown parameter: " << letter << "\n";
           return false;
@@ -219,6 +229,23 @@ int main(int argc, char **argv) {
     if (!events)
       crash("Cannot open timestamp file");
   }
+  std::uint64_t skip = p.skip_count;
+  skip *= sizeof(raw_t);
+  skip *= p.totalchans;
+  std::cerr << "hello world\n" << "skip = " << skip << " " << sizeof(skip) << "\n";
+ 
+  while (skip>0) {
+      std::cerr << "left to skip " << skip <<"\n";
+      std::uint64_t skipnow = skip;
+      if (skipnow>1024*1024*1024)
+          skipnow = 1024*1024*1024;
+      std::cerr << "skipping now " << skipnow << "\n";
+      if (fseek(in, skipnow, SEEK_CUR) != 0) {
+          std::cerr << "FSEEK FAILED: " << strerror(errno) << "\n";
+          return 2;
+      }
+      skip -= skipnow;
+  }
 
   const int BUFSAMS = 1<<p.log2bufsize;
   const int FRAGSAMS = BUFSAMS / 4;
@@ -241,9 +268,12 @@ int main(int argc, char **argv) {
   timeref_t savedto = 0;
   timeref_t nextpeg = p.delay_sams ? p.delay_sams : INFTY;
 
-  if (events) 
+  if (events) {
     if (std::fscanf(events, "%lu", &nextpeg) < 1)
       nextpeg = INFTY;
+    else
+      nextpeg -= p.skip_count;
+  }
   
   std::vector<float> thresh(p.nchans, p.thresh_digi);
   std::vector<raw_t> basesub(p.nchans, 0);
@@ -297,6 +327,8 @@ int main(int argc, char **argv) {
              out);
       savedto += FRAGSAMS;
     }
+    if (savedto >= p.limit_count)
+      return 0;
 
     // -- subtract baseline
     if (p.basesub) {    

@@ -124,7 +124,7 @@ private:
   real_t alpha0, alpha1, alpha2, alpha3;
   int toopoorcnt;
   bool negv;
-  timeref_t t_peg;
+  // timeref_t t_peg;
 public:
   // debug
   void report();

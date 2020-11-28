@@ -272,11 +272,13 @@ int main(int argc, char **argv) {
 
   if (events) {
     while (true) {
-      if (std::fscanf(events, "%llu", &nextpeg) < 1) {
+      long long unsigned int val;
+      if (std::fscanf(events, "%llu", &val) < 1) {
         nextpeg = INFTY;
         //std::cerr << "nextpeg = infty\n";
         break;
       } else {
+        nextpeg = val;
         if (nextpeg >= p.skip_count) {
           nextpeg -= p.skip_count;
           //std::cerr << "nextpeg now positive\n";
@@ -396,10 +398,11 @@ int main(int argc, char **argv) {
         if (p.period_sams) {
           nextpeg += p.period_sams;
         } else if (events) {
-          if (std::fscanf(events, "%llu", &nextpeg) < 1)
+          long long unsigned int val;
+          if (std::fscanf(events, "%llu", &val) < 1)
             nextpeg = INFTY;
           else
-            nextpeg -= p.skip_count;
+            nextpeg = val - p.skip_count;
         }
       } else {
         // process as far as we have loaded
@@ -423,7 +426,7 @@ int main(int argc, char **argv) {
           for (int hw=p.nchans; hw<p.totalchans; hw++)
             outbufs[hw][tt] = inbufs[hw][tt];
         pool.wait();
-        processedto=mightprocessto;
+        processedto = mightprocessto;
       }
     }
 

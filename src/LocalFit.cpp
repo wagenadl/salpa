@@ -58,7 +58,8 @@ LocalFit::LocalFit(CyclBuf<raw_t> const &source0,
   t_chi2(t_chi20) {
   usenegv = true;
   state = State::PEGGED;
-  t_peg = t_stream = t_start;
+  // t_peg = t_start;
+  t_stream = t_start;
   init_T();
   rail1=RAIL1; rail2=RAIL2;
 }
@@ -68,7 +69,8 @@ void LocalFit::setusenegv(bool t) {
 }
 
 void LocalFit::reset(timeref_t t_start) {
-  t_peg = t_stream = t_start;
+  // t_peg = t_start;
+  t_stream = t_start;
   state = State::PEGGED;
 }
 
@@ -100,16 +102,16 @@ timeref_t LocalFit::process(timeref_t t_limit) {
 }
 
 timeref_t LocalFit::forcepeg(timeref_t t_from, timeref_t t_to) {
-  state=statemachine(t_from-tau, state);
+  state = statemachine(t_from - tau, state);
   if (state==State::OK) {
     // goto state PEGGING
-      t0=t_stream-1;
+      t0 = t_stream - 1;
       calc_X3();
       calc_alpha0123();
-      statemachine(t_from, State::PEGGING);
+      state = statemachine(t_from, State::PEGGING);
   }
-  t0=t_to;
-  state=statemachine(t_to, State::FORCEPEG);
+  t0 = t_to;
+  state = statemachine(t_to, State::FORCEPEG);
   return t_stream;
 }
 
@@ -254,10 +256,10 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
 
 //////////////////////////////////////////////////
  l_PEGGING: {
-    if (t_stream>=t_limit)
+    if (t_stream >= t_limit)
       return State::PEGGING;
-    if (t_stream >= t0+tau) {
-      t_peg = t_stream;
+    if (t_stream >= t0 + tau) {
+      // t_peg = t_stream;
       goto l_PEGGED;
     }
     int dt = t_stream - t0;

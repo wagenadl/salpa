@@ -185,6 +185,8 @@ public:
       nchans = totalchans = 64;
     if (nchans>totalchans)
       return false;
+    if (blank_sams > tau_sams)
+      return false;
     return true;
   }
 };
@@ -232,14 +234,14 @@ int main(int argc, char **argv) {
   std::uint64_t skip = p.skip_count;
   skip *= sizeof(raw_t);
   skip *= p.totalchans;
-  std::cerr << "hello world\n" << "skip = " << skip << " " << sizeof(skip) << "\n";
+  //std::cerr << "hello world\n" << "skip = " << skip << " " << sizeof(skip) << "\n";
  
   while (skip>0) {
-      std::cerr << "left to skip " << skip <<"\n";
+      //std::cerr << "left to skip " << skip <<"\n";
       std::uint64_t skipnow = skip;
       if (skipnow>1024*1024*1024)
           skipnow = 1024*1024*1024;
-      std::cerr << "skipping now " << skipnow << "\n";
+      //std::cerr << "skipping now " << skipnow << "\n";
       if (fseek(in, skipnow, SEEK_CUR) != 0) {
           std::cerr << "FSEEK FAILED: " << strerror(errno) << "\n";
           return 2;
@@ -269,11 +271,23 @@ int main(int argc, char **argv) {
   timeref_t nextpeg = p.delay_sams ? p.delay_sams : INFTY;
 
   if (events) {
-    if (std::fscanf(events, "%lu", &nextpeg) < 1)
-      nextpeg = INFTY;
-    else
-      nextpeg -= p.skip_count;
+    while (true) {
+      if (std::fscanf(events, "%llu", &nextpeg) < 1) {
+        nextpeg = INFTY;
+        //std::cerr << "nextpeg = infty\n";
+        break;
+      } else {
+        if (nextpeg >= p.skip_count) {
+          nextpeg -= p.skip_count;
+          //std::cerr << "nextpeg now positive\n";
+          break;
+        } else {
+          //std::cerr << "skipping peg at " << nextpeg << " -  " << p.skip_count << "\n";
+        }
+      }
+    }
   }
+  
   
   std::vector<float> thresh(p.nchans, p.thresh_digi);
   std::vector<raw_t> basesub(p.nchans, 0);
@@ -314,8 +328,12 @@ int main(int argc, char **argv) {
   //          << filledto << " " << nextpeg << " " << events << "\n";
 
   TaskQueue<std::packaged_task<void()>> pool(p.nthreads);
-  
+  timeref_t nexthello = 1000*1000;
   while (go_on) {
+      if (processedto > nexthello) {
+          std::cerr << "Processed " << processedto << " samples\n";
+          nexthello += 1000*1000;
+      }
     go_on = false;
 
     // -- save some stuff
@@ -327,7 +345,7 @@ int main(int argc, char **argv) {
              out);
       savedto += FRAGSAMS;
     }
-    if (savedto >= p.limit_count)
+    if (p.limit_count>0 && savedto >= p.limit_count)
       return 0;
 
     // -- subtract baseline
@@ -349,6 +367,7 @@ int main(int argc, char **argv) {
     while (processedto < mightprocessto) {
       go_on=true;
       if (nextpeg < mightprocessto) {
+        //std::cerr << "processing to peg at " << nextpeg << "\n";
         // process to upcoming peg
         int step = p.nchans / p.nthreads;
         if (step*p.nthreads < p.nchans)
@@ -374,11 +393,14 @@ int main(int argc, char **argv) {
 
         processedto = nextpeg + p.forcepeg_sams;
         // find next peg
-        if (p.period_sams) 
+        if (p.period_sams) {
           nextpeg += p.period_sams;
-        else if (events)
-          if (std::fscanf(events, "%lu", &nextpeg) < 1)
+        } else if (events) {
+          if (std::fscanf(events, "%llu", &nextpeg) < 1)
             nextpeg = INFTY;
+          else
+            nextpeg -= p.skip_count;
+        }
       } else {
         // process as far as we have loaded
         int step = p.nchans / p.nthreads;
@@ -451,7 +473,3 @@ int main(int argc, char **argv) {
   }
   return 0;
 }
-
-  
-      
-    

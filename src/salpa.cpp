@@ -366,9 +366,9 @@ int main(int argc, char **argv) {
       - p.forcepeg_sams - 3*p.tau_sams - 2;
     if (mightprocessto > savedto + BUFSAMS)
       mightprocessto = savedto + BUFSAMS;
-    if (nextpeg >= mightprocessto
-        && nextpeg - 2*p.tau_sams < mightprocessto)
-      mightprocessto -= 2*p.tau_sams;
+    if (nextpeg + p.forcepeg_sams + 1 >= mightprocessto
+        && nextpeg - p.tau_sams - 1 < mightprocessto)
+      mightprocessto = nextpeg - p.tau_sams - 1;
     while (processedto < mightprocessto) {
       go_on=true;
       if (nextpeg < mightprocessto) {
@@ -456,6 +456,8 @@ int main(int argc, char **argv) {
   
   // let's process the last bit...
   timeref_t mightprocessto = filledto - p.tau_sams - 1;
+  if (mightprocessto > nextpeg - p.tau_sams - 1)
+    mightprocessto = nextpeg - p.tau_sams - 1;
   for (timeref_t tt=processedto; tt<mightprocessto; tt++)
     for (int hw=p.nchans; hw<p.totalchans; hw++)
       outbufs[hw][tt] = inbufs[hw][tt];
@@ -463,12 +465,14 @@ int main(int argc, char **argv) {
     if (fitters[hw]->process(mightprocessto) != mightprocessto)
       crash("LocalFit doesn't like my data!");
   processedto = mightprocessto;
+  if (nextpeg > filledto)
+    nextpeg = filledto;
   mightprocessto = filledto;
   for (timeref_t tt=processedto; tt<mightprocessto; tt++)
     for (int hw=p.nchans; hw<p.totalchans; hw++)
       outbufs[hw][tt] = inbufs[hw][tt];
   for (int hw=0; hw<p.nchans; hw++) 
-    if (fitters[hw]->forcepeg(mightprocessto, mightprocessto)
+    if (fitters[hw]->forcepeg(nextpeg, mightprocessto)
         != mightprocessto)
       crash("LocalFit doesn't like my data!");
   processedto = mightprocessto;

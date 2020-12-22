@@ -215,6 +215,7 @@ int main(int argc, char **argv) {
   FILE *in = stdin;
   FILE *out = stdout;
   FILE *events = 0;
+  char linebuf[100];
 
   if (p.input_filename) {
     in = std::fopen(p.input_filename, "rb");
@@ -269,27 +270,33 @@ int main(int argc, char **argv) {
   timeref_t processedto = 0;
   timeref_t savedto = 0;
   timeref_t nextpeg = p.delay_sams ? p.delay_sams : INFTY;
+  timeref_t nextforcepeg_sams = p.forcepeg_sams;
 
   if (events) {
     while (true) {
-      long long unsigned int val;
-      if (std::fscanf(events, "%llu", &val) < 1) {
-        nextpeg = INFTY;
-        //std::cerr << "nextpeg = infty\n";
-        break;
-      } else {
-        nextpeg = val;
+      if (std::fgets(linebuf, 99, events)) {
+        linebuf[99] = 0;
+        char const *spc = std::strchr(linebuf, ' ');
+        nextpeg = std::atoll(linebuf);
+        if (spc) {
+          while (*spc==32)
+            spc++;
+          nextforcepeg_sams = std::atoll(linebuf);
+        } else {
+          nextforcepeg_sams = p.forcepeg_sams;
+        }
         if (nextpeg >= p.skip_count) {
           nextpeg -= p.skip_count;
           //std::cerr << "nextpeg now positive\n";
           break;
-        } else {
-          //std::cerr << "skipping peg at " << nextpeg << " -  " << p.skip_count << "\n";
         }
+      } else {
+        nextpeg = INFTY;
+        //std::cerr << "nextpeg = infty\n";
+        break;
       }
     }
   }
-  
   
   std::vector<float> thresh(p.nchans, p.thresh_digi);
   std::vector<raw_t> basesub(p.nchans, 0);
@@ -363,10 +370,10 @@ int main(int argc, char **argv) {
 
     // -- subtract artifacts
     timeref_t mightprocessto = filledto
-      - p.forcepeg_sams - 3*p.tau_sams - 2;
+      - nextforcepeg_sams - 3*p.tau_sams - 2;
     if (mightprocessto > savedto + BUFSAMS)
       mightprocessto = savedto + BUFSAMS;
-    if (nextpeg + p.forcepeg_sams + 1 >= mightprocessto
+    if (nextpeg + nextforcepeg_sams + 1 >= mightprocessto
         && nextpeg - p.tau_sams - 1 < mightprocessto)
       mightprocessto = nextpeg - p.tau_sams - 1;
     while (processedto < mightprocessto) {
@@ -378,7 +385,7 @@ int main(int argc, char **argv) {
         if (step*p.nthreads < p.nchans)
           step ++;
         timeref_t t1 = nextpeg;
-        timeref_t t2 = nextpeg + p.forcepeg_sams;
+        timeref_t t2 = nextpeg + nextforcepeg_sams;
         for (int c0=0; c0<p.nchans; c0+=step) {
           int c1 = c0 + step;
           if (c1>p.nchans)
@@ -391,21 +398,30 @@ int main(int argc, char **argv) {
           pool.post(task);
         }
         // first, copy non-electrode channels
-        for (timeref_t tt=processedto; tt<nextpeg+p.forcepeg_sams; tt++)
+        for (timeref_t tt=processedto; tt<nextpeg+nextforcepeg_sams; tt++)
           for (int hw=p.nchans; hw<p.totalchans; hw++)
             outbufs[hw][tt] = inbufs[hw][tt];
         pool.wait();
 
-        processedto = nextpeg + p.forcepeg_sams;
+        processedto = nextpeg + nextforcepeg_sams;
         // find next peg
         if (p.period_sams) {
           nextpeg += p.period_sams;
         } else if (events) {
-          long long unsigned int val;
-          if (std::fscanf(events, "%llu", &val) < 1)
+          if (std::fgets(linebuf, 99, events)) {
+            linebuf[99] = 0;
+            char const *spc = std::strchr(linebuf, ' ');
+            nextpeg = std::atoll(linebuf) - p.skip_count;
+            if (spc) {
+              while (*spc==32)
+                spc++;
+              nextforcepeg_sams = std::atoll(linebuf);
+            } else {
+              nextforcepeg_sams = p.forcepeg_sams;
+            }
+          } else {
             nextpeg = INFTY;
-          else
-            nextpeg = val - p.skip_count;
+          }
         }
       } else {
         // process as far as we have loaded

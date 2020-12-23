@@ -286,7 +286,7 @@ int main(int argc, char **argv) {
         if (spc) {
           while (*spc==32)
             spc++;
-          nextforcepeg_sams = std::atoll(linebuf);
+          nextforcepeg_sams = std::atoll(spc);
         } else {
           nextforcepeg_sams = p.forcepeg_sams;
         }
@@ -420,7 +420,7 @@ int main(int argc, char **argv) {
             if (spc) {
               while (*spc==32)
                 spc++;
-              nextforcepeg_sams = std::atoll(linebuf);
+              nextforcepeg_sams = std::atoll(spc);
             } else {
               nextforcepeg_sams = p.forcepeg_sams;
             }

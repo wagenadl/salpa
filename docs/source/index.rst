@@ -6,6 +6,9 @@
 SALPA
 =====
 
+Introduction
+-----------------
+
 This document explains how to use the SALPA algorithm from the command line,
 or from within Python or Octave/Matlab. The algorithm itself is explained in
 Wagenaar and Potter, Real-time multi-channel stimulus artifact suppression by local curve fitting. *J. Neurosci. Methods* **120**, 113–120, available from the
@@ -178,4 +181,11 @@ Python usage
 A Python module named “salpa” is provided to wrap around the binary.
 
 This module defines two functions: :ref:`salpaparams` and :ref:`salparun`. 
-  
+ 
+ 
+.. toctree::
+   :maxdepth: 1
+   :caption: TOC
+
+   python
+   

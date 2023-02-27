@@ -15,8 +15,6 @@
 # sys.path.insert(0, os.path.abspath('.'))
 
 import sys
-import os
-print("CONF.PY", os.getcwd())
 sys.path.insert(0, "../../python/src")
 
 # -- Project information -----------------------------------------------------

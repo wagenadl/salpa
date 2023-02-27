@@ -47,82 +47,82 @@ integers, with arbitrary numbers of channels.
 
 The program understands the following arguments:
 
-- **F** *f*
+- **-F** *f*
 
   The sampling rate is *f*, measured in Hertz. This argument must
   precede any of the arguments that are measured in
   milliseconds. (Default: 30,000 Hz.)
 
-- **c** *n*
+- **-c** *n*
 
   The number of electrode channels in the file is *n*. (Default: equal
-  to the total number of channels (see **C**), or 64 if neither is
+  to the total number of channels (see **-C**), or 64 if neither is
   explicitly given.)
 
-- **C** *m*
+- **-C** *m*
 
   The total number of channels in the file is *m*. As an example,
   MultiChannel Systems’ binary files contain 60 electrode channels and
   4 auxiliary channels, for a total of 64 channel. Similar
   arrangements are found in some OpenEphys recordings. (Default: equal
-  to the number of probe channels (see **c**).)
+  to the number of probe channels (see **-c**).)
 
   Auxiliary channels are copied verbatim from input to output, without
   any processing.
 
-- **t** *d*
+- **-t** *d*
 
   The threshold on the residual error for resuming normal operation
   after detecting an artifact is *d* digital units. (No default; see
-  **x**.)
+  **-x**.)
 
-- **x** *x*
+- **-x** *x*
 
   The threshold on the residual error for resuming normal operation
   after detecting an artifact is *x* times the RMS noise of each
   respective channel. (Default: 3.)
 
-  Note that **t** and **x** are mutually exclusive
+  Note that **-t** and **-x** are mutually exclusive
     
-- **l** *τ*
+- **-l** *τ*
 
   (That's lowercase ℓ, not upper case 𝐼.) The half-width of the
   template for artifact-shape fitting is *τ*, measured in
   milliseconds. (Default: 3 ms.)
 
-- **a** *t*
+- **-a** *t*
 
   The window over which residual error is calculated is *t*, measured
   in milliseconds. (Can usually be left to its default value, 0.2 ms.)
 
-- **b** *t*
+- **-b** *t*
 
   A segment of *t* milliseconds is blanked before resuming normal
   operation. *t* must be less than the *τ* value given with
-  **l**. (Can usually be left to its default value, 0.4 ms.)
+  **-l**. (Can usually be left to its default value, 0.4 ms.)
 
-- **Z**
+- **-Z**
 
-  If **Z** is given, “blanking” operations requested by **b** are
+  If **-Z** is given, “blanking” operations requested by **-b** are
   terminated early if the signal crosses zero.
 
-- **r** *a*,*b*
+- **-r** *a*,*b*
 
   When the digital value of any channel dips is less than or equal to
   *a*, or greater than or equal to *b*, treat the following segment as
-  artifact. (Default: *a* = -32767, *b* = 32767. See also **A**.)
+  artifact. (Default: *a* = -32767, *b* = 32767. See also **-A**.)
   
-- **A** *t*
+- **-A** *t*
 
   Look ahead *t* milliseconds for automatic artifact
   detection. (Default: 0.2 ms. See also **r**.)
 
-- **f** *t*
+- **-f** *t*
 
   Enforce a minimum duration of *t* milliseconds for automatically
   detected artifacts.
 
-- **P** *filename*
+- **-P** *filename*
 
   Artifacts are assumed to exist across all channels at the times
   specified in the named file. Each line of the file must contain two
@@ -130,40 +130,40 @@ The program understands the following arguments:
   duration of that artifact (also in samples). The lines must appear
   in temporal order.
 
-- **T** *n*
+- **-T** *n*
 
   Use *n* CPU threads for processing. (Default: 8.)
 
-- **S** *n*
+- **-S** *n*
 
   Use a buffer size of *n* scans. (Default: 4096, internally rounded
   down to a power of two.)
 
-- **M** *n*
+- **-M** *n*
 
   Skip first *n* scans from the beginning of the file. (Default: do
   not skip.)
 
-  **Note:** The numbers in the file specified with **P** are measured
+  **Note:** The numbers in the file specified with **-P** are measured
   after the skip. That is, if the number *k* appears in the file, the
   artifact is presumed to exist *n* + *k* from the beginning of the
   file.
 
-- **N** *n*
+- **-N** *n*
 
   Only process the first *n* scans of the file. (Not including any
-  skipped scans specified with **M**; Default: process entire file.)
+  skipped scans specified with **-M**; Default: process entire file.)
 
-- **B**
+- **-B**
 
   If given, subtract baseline before processing. Values specified with
-  **r** are relative to subtracted baseline.
+  **-r** are relative to subtracted baseline.
 
-- **i** *filename*
+- **-i** *filename*
 
   Read input from the named file. (Default: read from *stdin*.)
 
-- **o** *filename*
+- **-o** *filename*
 
   Send output to the named file. (Default: write to *stdout*.)
 

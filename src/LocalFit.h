@@ -67,8 +67,8 @@ public:
      *: t_0 is implicitly equal to t_stream and not kept
      +: t_0 is used to mark end of forced peg
   */
-  static constexpr raw_t RAIL1=0;
-  static constexpr raw_t RAIL2=4095;
+  static constexpr raw_t RAIL1=-30000;
+  static constexpr raw_t RAIL2=30000;
   static constexpr timeref_t TCHI2=15; // samples
   static constexpr timeref_t BLANKDEP=5; // samples
   static constexpr timeref_t AHEAD=5; // samples
@@ -92,7 +92,7 @@ private:
   void calc_alpha0123(); // from X0123
   inline void calc_alpha0(); // from X02
   State statemachine(timeref_t t_limit, State s);
-  bool ispegged(raw_t value) { return value==rail1 || value==rail2; }
+  inline bool ispegged(raw_t value) { return value<=rail1 || value>=rail2; }
 private:
   // external world communication
   CyclBuf<raw_t> const &source;
@@ -132,6 +132,7 @@ public:
   void inirep();
   char const *stateName(State s);
   void crash(char const *);
+  int debug_name;
 };
 
 #endif

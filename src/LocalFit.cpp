@@ -62,6 +62,7 @@ LocalFit::LocalFit(CyclBuf<raw_t> const &source0,
   t_stream = t_start;
   init_T();
   rail1=RAIL1; rail2=RAIL2;
+  debug_name = -1;
 }
 
 void LocalFit::setusenegv(bool t) {
@@ -281,6 +282,8 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
     y -= alpha0;
     dest[t_stream++] = y;
     if (ispegged(source[t_stream+tau+t_ahead])) {
+        if (debug_name==0)
+            std::cerr << "salpa " << debug_name << " going from OK to pegging at " << t_stream+tau+t_ahead << " because " << source[t_stream+tau+t_ahead] << "\n";
       t0 = t_stream-1;
       calc_X3();
       calc_alpha0123();

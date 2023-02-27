@@ -159,7 +159,8 @@ public:
         case 'r': {
           rail1 = atoi(arg);
           char *x = std::strchr(arg, ',');
-          rail2 = x ? atoi(x+1) : rail1;
+          if (x)
+            rail2 = atoi(x+1); //  : rail1;
         } break;
         case 'p': period_sams = int(freq_hz * atof(arg) / 1000); break;
         case 'd': delay_sams = int(freq_hz * atof(arg) / 1000); break;
@@ -217,33 +218,32 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  FILE *in = stdin;
-  FILE *out = stdout;
-  FILE *events = 0;
-  char linebuf[100];
+  FILE *in = p.input_filename
+    ? std::fopen(p.input_filename, "rb")
+    : std::freopen(0, "rb", stdin);
+  if (!in)
+    crash("Cannot open input file");
 
-  if (p.input_filename) {
-    in = std::fopen(p.input_filename, "rb");
-    if (!in)
-      crash("Cannot open input file");
-  }
-  if (p.output_filename) {
-    out = std::fopen(p.output_filename, "wb");
-    if (!out)
-      crash("Cannot open output file");
-  }
-  if (p.forcepeg_filename) {
-    events = std::fopen(p.forcepeg_filename, "r");
-    if (!events)
-      crash("Cannot open timestamp file");
-  }
+  FILE *out = p.output_filename
+    ? std::fopen(p.output_filename, "wb")
+    : std::freopen(0, "wb", stdout);
+  if (!out)
+    crash("Cannot open output file");
+
+  FILE *events = p.forcepeg_filename
+    ? std::fopen(p.forcepeg_filename, "r")
+    : 0;
+  if (p.forcepeg_filename && !events)
+    crash("Cannot open timestamp file");
+
+  char linebuf[100];
   std::uint64_t skip = p.skip_count;
   skip *= sizeof(raw_t);
   skip *= p.totalchans;
-  //std::cerr << "hello world\n" << "skip = " << skip << " " << sizeof(skip) << "\n";
+  std::cerr << "SALPA says hello\n" << "skip = " << skip << " " << sizeof(skip) << "\n";
  
   while (skip>0) {
-      //std::cerr << "left to skip " << skip <<"\n";
+      std::cerr << "SALPA left to skip " << skip <<"\n";
       std::uint64_t skipnow = skip;
       if (skipnow>1024*1024*1024)
           skipnow = 1024*1024*1024;
@@ -278,6 +278,7 @@ int main(int argc, char **argv) {
   timeref_t nextforcepeg_sams = p.forcepeg_sams;
 
   if (events) {
+    std::cerr << "Salpa running with events\n";
     while (true) {
       if (std::fgets(linebuf, 99, events)) {
         linebuf[99] = 0;
@@ -292,12 +293,12 @@ int main(int argc, char **argv) {
         }
         if (nextpeg >= p.skip_count) {
           nextpeg -= p.skip_count;
-          //std::cerr << "nextpeg now positive\n";
+          std::cerr << "nextpeg now positive\n";
           break;
         }
       } else {
         nextpeg = INFTY;
-        //std::cerr << "nextpeg = infty\n";
+        std::cerr << "nextpeg = infty\n";
         break;
       }
     }
@@ -307,6 +308,7 @@ int main(int argc, char **argv) {
   std::vector<raw_t> basesub(p.nchans, 0);
 
   if (p.thresh_std!=0 || p.basesub) {
+      std::cerr << "salpa estimating noise\n";
     int n = std::fread(inbuf.data(),
                        p.totalchans*sizeof(raw_t), 3*FRAGSAMS,
                        in);
@@ -325,6 +327,7 @@ int main(int argc, char **argv) {
   }
   
   std::vector<LocalFit *> fitters(p.nchans, 0);
+  std::cerr << "rails " << p.rail1 << " and " << p.rail2 << " plus " << basesub[0] << "\n";
   for (int c=0; c<p.nchans; c++) {
     fitters[c] = new LocalFit(inbufs[c], outbufs[c],
                               0, thresh[c], p.tau_sams,
@@ -332,6 +335,7 @@ int main(int argc, char **argv) {
                               p.asym_sams);
     fitters[c]->setrail(p.rail1 + basesub[c], p.rail2 + basesub[c]);
     fitters[c]->setusenegv(p.usenegv);
+    fitters[c]->debug_name = c;
   }
   
   bool at_eof = false;
@@ -341,12 +345,13 @@ int main(int argc, char **argv) {
   //std::cerr << "pre\n" << savedto << " " << processedto << " "
   //          << filledto << " " << nextpeg << " " << events << "\n";
 
+  std::cerr << "salpa ready to go\n";
   TaskQueue<std::packaged_task<void()>> pool(p.nthreads);
-  timeref_t nexthello = 1000*1000;
+  timeref_t nexthello = 0;
   while (go_on) {
-      if (processedto > nexthello) {
+      if (processedto >= nexthello) {
           std::cerr << "Processed " << processedto << " samples\n";
-          nexthello += 1000*1000;
+          nexthello += 100*1000;
       }
     go_on = false;
 
@@ -469,6 +474,8 @@ int main(int argc, char **argv) {
     }
   }
 
+  std::cerr << "salpa nearly done\n";
+
   // -- EOF!
 
   //std::cerr << "go_on\n" << savedto << " " << processedto << " "
@@ -497,6 +504,8 @@ int main(int argc, char **argv) {
         != mightprocessto)
       crash("LocalFit doesn't like my data!");
   processedto = mightprocessto;
+
+  std::cerr << "salpa saving last bit\n";
   
   // let's save last bit
   const int BUFMASK = BUFSAMS - 1;
@@ -512,5 +521,6 @@ int main(int argc, char **argv) {
                 out);
     savedto = saveto;
   }
+  std::cerr << "salpa all the way done";
   return 0;
 }

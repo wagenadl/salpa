@@ -14,3 +14,4 @@ add_executable(salpa WIN32 MACOSX_BUNDLE src/salpa.cpp src/LocalFit.cpp)
 
 add_subdirectory("docs")
 add_subdirectory("python")
+add_subdirectory("matlab")

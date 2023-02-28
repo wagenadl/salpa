@@ -3,16 +3,16 @@ Python API
 
 .. _salpaparams:
 
-salpa.params
-------------
+salpa.fsalpa.params
+-------------------
 
-.. autofunction:: salpa.params
+.. autofunction:: salpa.fsalpa.params
 
 .. _salparun:
 
-salpa.run
----------
+salpa.fsalpa.run
+----------------
 
-.. autofunction:: salpa.run
+.. autofunction:: salpa.fsalpa.run
    
 

@@ -18,6 +18,7 @@
 
 // LocalFit.cpp
 
+//#define TEST 1
 #include "LocalFit.h"
 #include <iostream>
 
@@ -29,43 +30,87 @@
 
 #include <math.h>
 
-static raw_t LocalFit_X=0;
-static raw_t LocalFit_Y=0;
-raw_t LocalFit::ZERO       = LocalFit_X/LocalFit_Y; // NAN;
-raw_t LocalFit::RAIL1      = 0;
-raw_t LocalFit::RAIL2      = 4095;
-int   LocalFit::TCHI2      = 15; // samples
-int   LocalFit::BLANKDEP   = 5; // samples
-int   LocalFit::AHEAD      = 5; // samples
-int   LocalFit::TOOPOORCNT = 5;
+// static float LocalFit_X=0;
+// static float LocalFit_Y=0;
+// raw_t LocalFit::ZERO       = LocalFit_X/LocalFit_Y; // NAN;
+
+Error::Error(char const *issuer0, char const *cause0) {
+  issuer=issuer0;
+  cause=cause0;
+}
+
+Error::~Error() {
+}
+
+void Error::report(char const *src) const {
+  if (src)
+    fprintf(stderr,"%s: %s: %s\n",src,issuer?issuer:"",cause?cause:"");
+  else
+    fprintf(stderr,"%s: %s\n",issuer?issuer:"",cause?cause:"");
+}
+
+const timeref_t INFTY = (timeref_t)(-1);
+
+bool _sanity() {
+  timeref_t ttest = INFTY;
+  ttest++;
+  if (ttest!=0) {
+    printf("Warning! INFTY does not work on your platform. Please contact\nthe author, Daniel Wagenaar.\nFor contact information please visit http://www.danielwagenaar.net.\n");
+    return false;
+  }
+  if (sizeof(timeref_t)!=8) {
+    printf("Warning! I could not create an 8-bit integer type. Please contact\nthe author, Daniel Wagenaar.\nFor contact information please visit http://www.danielwagenaar.net.\n");
+    return false;
+  }
+  return true;
+}
+
 
 //--------------------------------------------------------------------
 // inline functions
 //
 inline void LocalFit::update_X012() {
-  real_t y_new = source[t_stream+tau];
-  real_t y_old = source[t_stream-tau-1];
+  double y_new = source[t_stream+tau];
+  double y_old = source[t_stream-tau-1];
   X0 += y_new - y_old;
   X1 += tau_plus_1*y_new - minus_tau*y_old - X0;
   X2 += tau_plus_1_squared*y_new - minus_tau_squared*y_old - X0 - 2*X1;
 }
 
 inline void LocalFit::calc_alpha0() {
-  alpha0 = real_t(T4*X0 - T2*X2)/real_t(T0*T4-T2*T2);
+  alpha0 = double(T4*X0 - T2*X2)/double(T0*T4-T2*T2);
 }
 
 //--------------------------------------------------------------------
 // Other LocalFit methods
 //
-LocalFit::LocalFit(raw_t const *source0, raw_t *dest0,
-		   timeref_t t_start, timeref_t t_end0,
-		   raw_t threshold0, int tau0,
-		   int t_blankdepeg0, int t_ahead0, int t_chi20):
+LocalFit::LocalFit(float const *source0, float *dest0,
+                   timeref_t t_end0,
+		   float threshold0, int tau0):
   source(source0), dest(dest0), y_threshold(threshold0), tau(tau0),
-  t_blankdepeg(t_blankdepeg0), t_ahead(t_ahead0),
-  t_chi2(t_chi20), t_end(t_end0) {
+  t_blankdepeg(BLANKDEP), t_ahead(AHEAD),
+  t_chi2(TCHI2), 
+  rail1(RAIL1), rail2(RAIL2),
+  t_end(t_end0) {
   init_T();
-  reset(t_start);
+  reset();
+}
+
+void LocalFit::set_t_blankdepeg(int t_blankdepeg1) {
+  t_blankdepeg = t_blankdepeg1;
+}
+
+void LocalFit::set_t_ahead(int t_ahead1) {
+  t_ahead = t_ahead1;
+}
+
+void LocalFit::set_t_chi2(int t_chi21) {
+  t_chi2 = t_chi21;
+}
+
+
+bool LocalFit::isValid() {
+  return _sanity();
 }
 
 void LocalFit::reset(timeref_t t_start) {
@@ -73,8 +118,12 @@ void LocalFit::reset(timeref_t t_start) {
   state=PEGGED;
 }
 
+void LocalFit::setrail(raw_t rail11, raw_t rail21) {
+  rail1 = rail11;
+  rail2 = rail21;
+}
+
 void LocalFit::init_T() {
-  rail1=RAIL1; rail2=RAIL2;
 #if ASYM_NOT_CHI2
   my_thresh = 3.92 * t_chi2 * y_threshold*y_threshold; // 95% conf limit
 #else
@@ -127,6 +176,7 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
    * On exit, t_stream == t_limit.
   */
   //  timeref_t t_check=0; //DBG
+  //  fprintf(stderr, "statemachine %Li %Li %i\n", t0, t_limit, s);
   switch (s) {
   case OK: goto l_OK;
   case PEGGED: goto l_PEGGED;
@@ -142,8 +192,10 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
  l_PEGGED: {
     if (t_stream>=t_limit)
       return PEGGED;
+    // fprintf(stderr, "PEGGED %Li %g %i\n", t_stream, source[t_stream],
+    //    ispegged(source[t_stream]));
     if (ispegged(source[t_stream])) {
-      dest[t_stream]=ZERO;
+      dest[t_stream] = ZERO;
       t_stream++;
       goto l_PEGGED;
     }
@@ -169,8 +221,8 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
     if (t_stream>=t_limit) 
       return TOOPOOR;
 #if ASYM_NOT_CHI2
-    real_t asym=0;
-    real_t sig=0;
+    double asym=0;
+    double sig=0;
     for (int i=0; i<t_chi2; i++) {
       timeref_t t_i = t_stream+i;
       if (t_i > t_end) {
@@ -180,7 +232,7 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
       int dt = int(t_i - t0);
       int dt2 = dt*dt;
       int dt3 = dt*dt2;
-      real_t dy = alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3 - source[t_i];
+      double dy = alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3 - source[t_i];
       asym += dy;
       sig += dy*dy;
     }
@@ -198,23 +250,24 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
       int dt2 = dt*dt;
       int dt3 = dt*dt2;
       negv =  source[t_stream]
-	< raw_t(alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3);
+	< float(alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3);
 #endif
 
 #ifdef TEST
-      real_t x0=X0,x1=X1,x2=X2,x3=X3;
+      double x0=X0,x1=X1,x2=X2,x3=X3;
 #endif
       calc_X012(); calc_X3(); // for numerical stability problem!
 #ifdef TEST
       if (x0!=X0 || x1!=X1 || x2!=X2 || x3!=X3)
-	fprintf(stderr,"CUMULANT ERROR: X=[%Li %Li %Li %Li] dx=[%Li %Li %Li %Li] (hw=%i, t=%.2f, dt=%Li, C=%Li)\n",
-		X0,X1,X2,X3,X0-x0,X1-x1,X2-x2,X3-x3,source.hw,t_stream/25.0,t_stream-t_depeg,t_stream-t_check);
+	fprintf(stderr,"CUMULANT ERROR: X=[%g %g %g %g] dx=[%g %g %g %g] (t=%.2f, dt=%Li, C=%Li)\n",
+		X0,X1,X2,X3,X0-x0,X1-x1,X2-x2,X3-x3,
+                t_stream/25.0,t_stream-t_depeg,t_stream-t_check);
       t_check=t_stream;
 #endif
       goto l_BLANKDEPEG;
     }
 #else
-    real_t chi2=0;
+    double chi2=0;
     for (int i=0; i<t_chi2; i++) {
       int t_i = t_stream+t_blankdepeg+i;
       if (t_i > t_end) {
@@ -224,7 +277,7 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
       int dt = int(t_i - t0);
       int dt2 = dt*dt;
       int dt3 = dt*dt2;
-      real_t dy = alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3 - source[t_i];
+      double dy = alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3 - source[t_i];
       chi2+=dy*dy;
     }
     ////    fprintf(stderr,"TOOPOOR: chi2=%g [%2f-%2f]\n",chi2,
@@ -235,7 +288,7 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
       int dt2 = dt*dt;
       int dt3 = dt*dt2;
       negv = source[t_stream]
-	< raw_t(alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3);
+	< float(alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3);
 #endif
       goto l_BLANKDEPEG;
     }
@@ -243,7 +296,7 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
 
 //    int dt=t_stream-t0; int dt2=dt*dt; int dt3=dt*dt2;
 //    dest[t_stream]=source[t_stream]-int(alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3);
-    dest[t_stream]=ZERO;
+    dest[t_stream] = ZERO;
     t_stream++; t0++;
     if (t0+tau>=t_end || ispegged(source[t0+tau])) {
       t0=t0+tau;
@@ -251,13 +304,14 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
     }
     update_X0123();
 #ifdef TEST
-    real_t x0=X0,x1=X1,x2=X2,x3=X3;
+    double x0=X0,x1=X1,x2=X2,x3=X3;
 #endif
     calc_X012(); calc_X3(); // for numerical stability problem!
 #ifdef TEST
     if (x0!=X0 || x1!=X1 || x2!=X2 || x3!=X3)
-      fprintf(stderr,"Cumulant error: X=[%Li %Li %Li %Li] dx=[%Li %Li %Li %Li] (hw=%i, t=%.2f, dt=%Li, C=%Li)\n",
-	      X0,X1,X2,X3,X0-x0,X1-x1,X2-x2,X3-x3,source.hw,t_stream/25.0,t_stream-t_depeg,t_stream-t_check);
+      fprintf(stderr,"Cumulant error: X=[%g %g %g %g] dx=[%g %g %g %g] (t=%.2f, dt=%Li, C=%Li)\n",
+	      X0,X1,X2,X3,X0-x0,X1-x1,X2-x2,X3-x3,
+              t_stream/25.0,t_stream-t_depeg,t_stream-t_check);
     t_check=t_stream;
 #endif
     calc_alpha0123();
@@ -272,7 +326,7 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
       return FORCEPEG;
     if (t_stream>=t0)
       goto l_PEGGED;
-    dest[t_stream]=ZERO;
+    dest[t_stream] = ZERO;
     t_stream++;
     goto l_FORCEPEG;
   }
@@ -281,6 +335,7 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
 
 //////////////////////////////////////////////////
  l_BLANKDEPEG: {
+   // fprintf(stderr, "BLANKDEPEG %Li %Li %i %i %Li\n", t_stream, t0, tau, t_blankdepeg, t_limit);
     if (t_stream>=t_limit)
       return BLANKDEPEG;
     if (t_stream >= t0-tau+t_blankdepeg)
@@ -289,8 +344,8 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
     int dt = int(t_stream-t0);
     int dt2 = dt*dt;
     int dt3 = dt*dt2;
-    raw_t y = source[t_stream]
-      - raw_t(alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3);
+    float y = source[t_stream]
+      - float(alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3);
     if ((y<0) != negv) {
       dest[t_stream] = y;
       t_stream++;
@@ -306,14 +361,14 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
 
 //////////////////////////////////////////////////
  l_DEPEGGING: {
+   // fprintf(stderr, "DEPEGGING %Li %Li\n", t_stream, t0);
     if (t_stream>=t_limit)
       return DEPEGGING;
 #if TEST
     if (t_depeg) {
-      fprintf(stderr,"%i %.5f %.2f\n",
-	      source.hw,
-	      t_stream/(1000.*FREQKHZ),
-	      (t_stream-t_depeg)/(1.*FREQKHZ));
+      fprintf(stderr,"%.5f %.2f\n",
+	      t_stream/(1000.*25),
+	      (t_stream-t_depeg)/(1.*25));
       // fprintf(stderr,"Lost time: %.2f ms on %i\n",(t_stream-t_depeg)/25.,source.hw);
       t_depeg=0;
     }
@@ -325,7 +380,7 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
     int dt2 = dt*dt;
     int dt3 = dt*dt2;
     dest[t_stream] = source[t_stream]
-      - raw_t(alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3);
+      - float(alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3);
     t_stream++;
     goto l_DEPEGGING;
   }
@@ -344,7 +399,7 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
     int dt2 = dt*dt;
     int dt3 = dt*dt2;
     dest[t_stream] = source[t_stream]
-      - raw_t(alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3);
+      - float(alpha0 + alpha1*dt + alpha2*dt2 + alpha3*dt3);
     t_stream++;
     goto l_PEGGING;
   }
@@ -356,7 +411,8 @@ LocalFit::State LocalFit::statemachine(timeref_t t_limit, State s) {
     if (t_stream>=t_limit)
       return OK;
     calc_alpha0();
-    dest[t_stream] = source[t_stream] - raw_t(alpha0);
+    //    fprintf(stderr, "OK %Li %g %g\n", t_stream, source[t_stream], alpha0);
+    dest[t_stream] = source[t_stream] - float(alpha0);
     t_stream++;
     if (t_stream+tau+t_ahead>=t_end ||
 	ispegged(source[t_stream+tau+t_ahead])) {
@@ -378,7 +434,7 @@ void LocalFit::calc_X012() {
   X0=X1=X2=0;
   for (int t=-tau; t<=tau; t++) {
     int_t t2=t*t;
-    real_t y=source[t0+t];
+    double y=source[t0+t];
     X0+=y;
     X1+=t*y;
     X2+=t2*y;
@@ -389,15 +445,15 @@ void LocalFit::calc_X3() {
   X3=0;
   for (int t=-tau; t<=tau; t++) {
     int_t t3=t*t*t;
-    real_t y=source[t0+t];
+    double y=source[t0+t];
     X3+=t3*y;
   }
 }
 
 void LocalFit::update_X0123() {
   // based on calc dd 9/7/01 - do recheck!
-  real_t y_new = source[t0+tau];
-  real_t y_old = source[t0-tau-1];
+  double y_new = source[t0+tau];
+  double y_old = source[t0-tau-1];
   X0 += y_new - y_old;
   X1 += tau_plus_1*y_new - minus_tau*y_old - X0;
   X2 += tau_plus_1_squared*y_new - minus_tau_squared*y_old - X0 - 2*X1;
@@ -405,15 +461,15 @@ void LocalFit::update_X0123() {
 }
 
 void LocalFit::calc_alpha0123() {
-  real_t fact02 = 1./(T0*T4-T2*T2);
+  double fact02 = 1./(T0*T4-T2*T2);
   alpha0 = fact02*(T4*X0 - T2*X2);
   alpha2 = fact02*(T0*X2 - T2*X0);
 #if THIRDORDER
-  real_t fact13 = 1./(T2*T6-T4*T4);
+  double fact13 = 1./(T2*T6-T4*T4);
   alpha1 = fact13*(T6*X1 - T4*X3);
   alpha3 = fact13*(T2*X3 - T4*X1);
 #else
-  alpha1 = real_t(X1)/T2;
+  alpha1 = double(X1)/T2;
   alpha3 = 0;
 #endif
 

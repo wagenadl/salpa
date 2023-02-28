@@ -33,7 +33,19 @@
    X1..X3.
 */
 
-#include "Types.h"
+typedef float raw_t;
+typedef double real_t;
+typedef unsigned long long timeref_t;
+
+class Error {
+public:
+  Error(char const *issuer0=0, char const *cause0=0);
+  virtual ~Error();
+  void report(char const *src=0) const;
+protected:
+  char const *issuer;
+  char const *cause;
+};
 
 class LocalFit {
 public:
@@ -52,23 +64,24 @@ public:
      *: t_0 is implicitly equal to t_stream and not kept
      +: t_0 is used to mark end of forced peg
   */
-  static raw_t ZERO;
-  static raw_t RAIL1;
-  static raw_t RAIL2;
-  static int TCHI2; // samples
-  static int BLANKDEP; // samples
-  static int AHEAD; // samples
-  static int TOOPOORCNT;
+  static constexpr raw_t ZERO = NAN;
+  static constexpr raw_t RAIL1 = -32767;
+  static constexpr raw_t RAIL2 = 32767;
+  static constexpr int TCHI2 = 15; // samples
+  static constexpr int BLANKDEP = 5; // samples
+  static constexpr int AHEAD  = 5; // samples
+  static constexpr int TOOPOORCNT = 5;
   typedef double int_t; // was "long long"...
 public: 
-  LocalFit(raw_t const *source, raw_t *dest,
-	   timeref_t t_start, timeref_t t_end, raw_t threshold, int tau,
-	   int t_blankdepeg=BLANKDEP, int t_ahead=AHEAD,
-	   int t_chi2=TCHI2);
+  LocalFit(raw_t const *source, raw_t *dest, timeref_t t_end, raw_t threshold, int tau);
+  void set_t_blankdepeg(int t_blankdepeg);
+  void set_t_ahead(int t_ahead);
+  void set_t_chi2(int t_chi2);
   void reset(timeref_t t_start=0);
-  void setrail(raw_t r1, raw_t r2) { rail1=r1; rail2=r2; }
+  void setrail(raw_t r1, raw_t r2);
   timeref_t process(timeref_t t_limit);
   timeref_t forcepeg(timeref_t t_from, timeref_t t_to);
+  static bool isValid();
 private:
   void init_T();
   void calc_X012(); // at t0
@@ -78,7 +91,7 @@ private:
   void calc_alpha0123(); // from X0123
   inline void calc_alpha0(); // from X02
   State statemachine(timeref_t t_limit, State s);
-  bool ispegged(raw_t value) { return value<=rail1 || value>=rail2; }
+  inline bool ispegged(raw_t value) { return value<=rail1 || value>=rail2; }
 private:
   // external world communication
   raw_t const *source;

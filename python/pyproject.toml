@@ -18,6 +18,8 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Operating System :: Microsoft :: Windows"
 ]
+[tool.setuptools]
+packages = ["salpa"]
 
 [project.urls]
 "Homepage" = "https://github.com/wagenadl/salpa"

@@ -1,0 +1,21 @@
+on:
+  push:
+    branches: [ "main" ]
+
+name: Build python on linux
+
+jobs:
+  build:
+    name: Build wheel
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@master
+      - name: Install requirements for building binary
+        run: .github/get-build-requirements-linux
+      - name: Build wheel
+        working-directory: ./python
+        run: python -m build
+      - name: check contents
+        run: ls -la python/dist
+        

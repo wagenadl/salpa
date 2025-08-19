@@ -19,5 +19,5 @@ jobs:
       - name: check wd
         run: pwd
       - name: check contents
-        run: ls -la
+        run: ls -la python
         

@@ -19,7 +19,7 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@master
       - name: Install requirements for building binary
-        run: .github/get-build-requirements
+        run: .github/get-build-requirements-linux
       - name: Build wheel
         working-directory: ./python
         run: python -m build

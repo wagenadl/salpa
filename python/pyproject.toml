@@ -13,8 +13,12 @@ description = "Artifact removal for multichannel electrophysiology"
 license = "GPL-3.0-or-later"
 readme = "README.md"
 requires-python = ">=3.12"
+dependencies = [
+    "numpy"
+]
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: C++",
     "Operating System :: POSIX :: Linux",
     "Operating System :: Microsoft :: Windows"
 ]

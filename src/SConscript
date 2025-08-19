@@ -1,4 +1,0 @@
-env = Environment()
-env.Replace(CXXFLAGS=['-O3','-Wall','-ansi','-pedantic', '-std=c++11'])
-#env.SharedLibrary('salpa', ['LocalFit.cpp'])
-env.Program('salpa', ['LocalFit.cpp', 'salpa.cpp'])

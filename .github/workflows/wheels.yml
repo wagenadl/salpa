@@ -11,7 +11,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
+        #, windows-latest]
 
     steps:
       - uses: actions/checkout@v5
@@ -39,7 +40,6 @@ jobs:
   upload_all:
     name: Upload wheels to release
     needs: [build_wheels]
-    environment: pypi
     permissions:
       id-token: write
       contents: write
@@ -49,8 +49,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: cibw-*
-          path: python
           merge-multiple: true
+      - name: what is happening
+        run: ls -lart
       - name: Upload the wheels
         uses: softprops/action-gh-release@v2
         with:

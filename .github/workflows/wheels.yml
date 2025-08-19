@@ -49,12 +49,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: cibw-*
+          path: wheels
           merge-multiple: true
-      - name: what is happening
-        run: ls -lart
       - name: Upload the wheels
         uses: softprops/action-gh-release@v2
         with:
-          files: python/wheelhouse/*whl
+          files: wheels/*whl
           token: ${{github.TOKEN}}
 

@@ -1,18 +1,14 @@
-Python API
-==========
+In-memory Python API
+====================
 
-.. _salpaparams:
+.. _SalpaClass:
 
-salpa.fsalpa.params
--------------------
+salpa.Salpa
+-----------
 
-.. autofunction:: salpa.fsalpa.params
+.. autoclass:: salpa.Salpa
 
-.. _salparun:
+salpa.salpa
+-----------
 
-salpa.fsalpa.run
-----------------
-
-.. autofunction:: salpa.fsalpa.run
-   
-
+.. autofunction:: salpa.salpa

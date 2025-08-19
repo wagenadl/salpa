@@ -19,9 +19,9 @@ Installation
 
 Prerequisites:
 
-- `SCons <https://scons.org>`_
+- CMake
 - A C++ compiler
-- Python (version 3.8 or later, optional)
+- Python (version 3.12 or later, optional)
 - Octave or Matlab (optional)
 
 Download the source from github:
@@ -32,12 +32,18 @@ enter the download folder:
 
     cd salpa
 
-and build using Scons:
+and build:
 
-    scons
+    make
 
 This creates a single binary "build/salpa", which may be copied to any
 convenient location on your $PATH.
+
+(The Makefile for this project simply invokes CMake; if you don't have Make on your system, you can invoke CMake directly:
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --config Release
+
 
 Command line usage
 ------------------
@@ -178,14 +184,30 @@ To process a Neuropixels file recorded by OpenEphys:
 Python usage
 ------------
 
-A Python module named “salpa” is provided to wrap around the binary.
+A Python module named “salpa” is provided that can apply the SALPA
+algorithm to in-memory data. 
 
-This module defines two functions: :ref:`salpaparams` and :ref:`salparun`. 
- 
+
  
 .. toctree::
    :maxdepth: 1
-   :caption: TOC
 
    python
+   
+
+
+  
+Python wrapper
+--------------
+
+A Python module named “salpa” is provided to wrap around the binary.
+
+This module defines two functions: :ref:`params` and :ref:`run` to
+define parameters for the underlying executable and to actually run
+it.
+ 
+.. toctree::
+   :maxdepth: 1
+
+   pythonwrapper
    

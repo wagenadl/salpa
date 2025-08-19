@@ -7,7 +7,7 @@
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(salpapy, m) {
+PYBIND11_MODULE(salpa_cppcore, m) {
   m.doc() = "SALPA plugin";
   py::class_<LocalFit>(m, "Salpa")
     //    .def(py::init<raw_t const *, raw_t *, timeref_t, raw_t, int>())

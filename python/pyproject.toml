@@ -10,11 +10,11 @@ authors = [
   { name="Daniel A. Wagenaar", email="daw@caltech.edu" },
 ]
 description = "Artifact removal for multichannel electrophysiology"
+license = "GPL-3.0-or-later"
 readme = "README.md"
 requires-python = ">=3.7"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Operating System :: POSIX :: Linux",
     "Operating System :: Microsoft :: Windows"
 ]

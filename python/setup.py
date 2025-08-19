@@ -2,6 +2,6 @@ from pybind11.setup_helpers import Pybind11Extension
 from setuptools import setup
 
 setup(ext_modules=[
-    Pybind11Extension("salpa/salpapy",
+    Pybind11Extension("salpapy",
                       ["salpa/salpapy.cpp", "salpa/LocalFit.cpp"])
     ])

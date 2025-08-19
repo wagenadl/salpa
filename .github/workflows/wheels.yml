@@ -51,9 +51,9 @@ jobs:
           pattern: cibw-*
           path: python
           merge-multiple: true
-        - name: Upload the wheels
-          uses: softprops/action-gh-release@v2
-          with:
-            files: python/wheelhouse/*whl
-            token: ${{github.TOKEN}}
+      - name: Upload the wheels
+        uses: softprops/action-gh-release@v2
+        with:
+          files: python/wheelhouse/*whl
+          token: ${{github.TOKEN}}
 

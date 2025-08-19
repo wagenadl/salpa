@@ -26,10 +26,12 @@ classifiers = [
 packages = ["salpa"]
 
 [tool.cibuildwheel]
-skip = "*arm64"
-skip = "*win32"
-skip = "*i686"
-skip = "*musllinux*"
+skip = [
+    "*arm64",
+    "*win32",
+    "*i686",
+    "*musllinux*"
+]
 
 [project.urls]
 "Homepage" = "https://github.com/wagenadl/salpa"

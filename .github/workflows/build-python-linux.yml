@@ -16,3 +16,8 @@ jobs:
       - name: Build wheel
         working-directory: ./python
         run: python -m build
+      - name: check wd
+        run: pwd
+      - name: check contents
+        run: ls -la
+        

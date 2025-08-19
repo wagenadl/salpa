@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from . import salpapy
+import salpa_cppcore
 import numpy as np
 import os
 
@@ -10,9 +10,9 @@ class Salpa:
         self.data = data.astype(np.float32)
         N = len(data)
         self.out = np.zeros(N, np.float32)
-        self.csalpa = salpapy.csalpa(self.data,
-                                     self.out,
-                                     thresh, tau)
+        self.csalpa = salpa_cppcore.csalpa(self.data,
+                                           self.out,
+                                           thresh, tau)
         self.csalpa.set_t_blankdepeg(t_blankdepeg)
         self.csalpa.set_t_ahead(t_ahead)
         self.csalpa.set_t_chi2(t_chi2)
